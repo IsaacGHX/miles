@@ -38,6 +38,24 @@ def patch_weight_to_mcore_format_preserve_fp32():
     print("[Patch] Applied patch to preserve FP32 precision in _weight_to_mcore_format")
 
 
+def patch_bridge_for_local_transformer_impl(bridge):
+    """Teach mbridge the norm names emitted by Megatron local specs."""
+    other_mapping = dict(getattr(bridge, "_OTHER_MAPPING", {}))
+    other_mapping.setdefault(
+        "input_layernorm.weight",
+        ["model.layers.{layer_number}.input_layernorm.weight"],
+    )
+    bridge._OTHER_MAPPING = other_mapping
+
+    mlp_mapping = dict(getattr(bridge, "_MLP_MAPPING", {}))
+    mlp_mapping.setdefault(
+        "pre_mlp_layernorm.weight",
+        ["model.layers.{layer_number}.post_attention_layernorm.weight"],
+    )
+    bridge._MLP_MAPPING = mlp_mapping
+    print("[Patch] Applied local transformer-impl norm-name mappings for mbridge")
+
+
 def add_convertion_args(parser):
     """Add conversion arguments to the parser"""
     parser.add_argument("--hf-checkpoint", type=str, required=True, help="HuggingFace model path")
@@ -134,6 +152,7 @@ def main():
 
     # Patch to preserve FP32 precision for _keep_fp32 params
     patch_weight_to_mcore_format_preserve_fp32()
+    patch_bridge_for_local_transformer_impl(bridge)
 
     bridge.load_weights(model, hf_model_path, memory_efficient=True)
     print(f"Model loaded: {hf_model_path}")
