@@ -6,7 +6,7 @@ from typing import Annotated
 import torch
 import typer
 
-from miles.ray.rollout import compute_perf_metrics_from_samples
+from miles.ray.rollout import compute_metrics_from_samples, compute_perf_metrics_from_samples
 from miles.utils.types import Sample
 
 _WHITELIST_KEYS = [
@@ -43,11 +43,16 @@ def main(
             # TODO read these configs from dumps
             args = SimpleNamespace(
                 advantage_estimator="grpo",
-                reward_key=None,
+                reward_key="score",
                 log_reward_category=None,
+                sglang_speculative_algorithm=None,
+                rollout_num_gpus=0,
             )
             sample_objects = [Sample.from_dict(s) for s in sample_dicts]
-            metrics = compute_perf_metrics_from_samples(args, sample_objects)
+            metrics = compute_metrics_from_samples(args, sample_objects)
+            rollout_time = pack.get("rollout_time")
+            if rollout_time is not None:
+                metrics |= compute_perf_metrics_from_samples(args, sample_objects, rollout_time)
             print("metrics", metrics)
 
         if show_samples:

@@ -19,6 +19,11 @@ For the cleanest teacher prompts, include the original user prompt in
 present, the helper falls back to `sample.prompt`, which may already be a
 chat-template-formatted string when `--apply-chat-template` is used.
 
+For broad math datasets such as DeepMath, run `examples/sdpo/preflight.sh` first
+so `math-verify` is available. The SDPO reward helper uses boxed exact matching,
+then `math_verify` equivalence checks when installed, and falls back to the
+integer-oriented DAPO verifier.
+
 ## What This Covers
 
 This is a lightweight SDPO-style example that does not require core MILES
@@ -63,9 +68,11 @@ Switch the training signal to the OPD path:
 SDPO_ARGS=(
    --advantage-estimator on_policy_distillation
    --use-kl-loss
-   --kl-loss-coef 0.00
+   --kl-loss-coef "${KL_LOSS_COEF:-0.001}"
    --kl-loss-type low_var_kl
-   --entropy-coef 0.00
+   --entropy-coef "${ENTROPY_COEF:-0.0}"
+   --eps-clip "${EPS_CLIP:-0.2}"
+   --eps-clip-high "${EPS_CLIP_HIGH:-0.3}"
 )
 ```
 
@@ -114,9 +121,14 @@ HF_CHECKPOINT=/path/to/Qwen3-8B \
 TORCH_DIST_CKPT=/path/to/Qwen3-8B_torch_dist \
 MILES_CKPT=/path/to/Qwen3-8B_miles \
 PROMPT_DATA=/path/to/dapo-math-17k.jsonl \
+DUMP_DETAILS=/path/to/dump_details \
 MEGATRON_PATH=/path/to/Megatron-LM \
 bash examples/sdpo/run-qwen3-8B-sdpo.sh
 ```
+
+Set `DUMP_DETAILS` to save per-rollout debug files under
+`$DUMP_DETAILS/rollout_data/{rollout_id}.pt`, together with train and logprob
+debug dumps.
 
 For a new model family/version such as Qwen3.5, keep the CUDA preflight
 unchanged and provide the matching Megatron model config:

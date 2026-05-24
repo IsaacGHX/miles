@@ -58,11 +58,7 @@ async def reward_func(args, sample: Sample, **kwargs):
 
     The returned dict works with `--reward-key score`.
     """
-    from miles.rollout.rm_hub.math_dapo_utils import compute_score
-
-    reward = compute_score(sample.response, sample.label)
-    if not isinstance(reward, dict):
-        reward = {"score": float(reward), "acc": float(reward), "pred": ""}
+    reward = _compute_math_reward(sample)
 
     feedback = reward.get("feedback", "")
     if not feedback and float(reward.get("score", 0.0)) < _env_float("SDPO_SUCCESS_REWARD_THRESHOLD", 0.5):
@@ -73,6 +69,94 @@ async def reward_func(args, sample: Sample, **kwargs):
             feedback = "Your previous answer was missing or had the wrong format. Put the final answer in \\boxed{}."
     reward["feedback"] = feedback
     return reward
+
+
+def _compute_math_reward(sample: Sample) -> dict[str, Any]:
+    backend = os.environ.get("SDPO_REWARD_BACKEND", "auto").strip().lower()
+    if backend in {"auto", "math_verify", "math-verify"}:
+        reward = _compute_math_verify_reward(sample.response, sample.label)
+        if reward is not None:
+            return reward
+        if backend in {"math_verify", "math-verify"}:
+            return _incorrect_reward("", "math_verify is not installed or could not verify the answer.")
+
+    try:
+        from miles.rollout.rm_hub.math_dapo_utils import compute_score
+
+        reward = compute_score(sample.response, sample.label)
+        if not isinstance(reward, dict):
+            return {"score": float(reward), "acc": float(reward), "pred": ""}
+        return reward
+    except Exception as exc:
+        return _incorrect_reward("", f"Reward verification failed for label {sample.label!r}: {exc}")
+
+
+def _compute_math_verify_reward(response: str, label: Any) -> dict[str, Any] | None:
+    pred = _extract_boxed(response)
+    if pred is None:
+        return _incorrect_reward("", "Your answer had the wrong format. Put the final answer in \\boxed{}.")
+
+    gold = str(label).strip()
+    if _normalize_answer_text(pred) == _normalize_answer_text(gold):
+        return {"score": 1.0, "acc": True, "pred": pred}
+
+    try:
+        from math_verify import parse as mv_parse
+        from math_verify import verify as mv_verify
+    except Exception:
+        return None
+
+    try:
+        correct = bool(mv_verify(mv_parse(gold), mv_parse(pred)))
+    except Exception:
+        correct = False
+
+    if correct:
+        return {"score": 1.0, "acc": True, "pred": pred}
+    return _incorrect_reward(pred, "")
+
+
+def _extract_boxed(text: str) -> str | None:
+    idx = text.rfind("\\boxed{")
+    if idx < 0:
+        return None
+
+    i = idx + len("\\boxed{")
+    depth = 1
+    while i < len(text):
+        char = text[i]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[idx + len("\\boxed{") : i].strip()
+        i += 1
+    return None
+
+
+def _normalize_answer_text(value: Any) -> str:
+    text = str(value).strip()
+    for before, after in (
+        ("\\dfrac", "\\frac"),
+        ("\\tfrac", "\\frac"),
+        ("\\left", ""),
+        ("\\right", ""),
+        (" ", ""),
+        (",", ""),
+        ("$", ""),
+    ):
+        text = text.replace(before, after)
+    return text
+
+
+def _incorrect_reward(pred: str, feedback: str) -> dict[str, Any]:
+    return {
+        "score": -1.0,
+        "acc": False,
+        "pred": pred,
+        "feedback": feedback,
+    }
 
 
 def post_process_rewards(args, samples: list[Sample], **kwargs):

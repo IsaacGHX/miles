@@ -13,8 +13,9 @@ RM_ARGS=(
 SDPO_ARGS=(
    --advantage-estimator on_policy_distillation
    --use-kl-loss
-   --kl-loss-coef 0.00
+   --kl-loss-coef "${KL_LOSS_COEF:-0.001}"
    --kl-loss-type low_var_kl
-   --entropy-coef 0.00
+   --entropy-coef "${ENTROPY_COEF:-0.0}"
+   --eps-clip "${EPS_CLIP:-0.2}"
+   --eps-clip-high "${EPS_CLIP_HIGH:-0.3}"
 )
-

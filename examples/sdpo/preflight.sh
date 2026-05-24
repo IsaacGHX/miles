@@ -295,6 +295,29 @@ install_python_cuda_headers_if_needed() {
    UV_LINK_MODE="${UV_LINK_MODE:-copy}" UV_CACHE_DIR="$UV_CACHE_DIR" uv pip install "${packages[@]}"
 }
 
+install_math_verify_if_needed() {
+   if python - <<'PY' >/dev/null 2>&1
+import math_verify
+PY
+   then
+      ok "math-verify import"
+      return 0
+   fi
+
+   if [ "${SDPO_PREFLIGHT_INSTALL_MATH_VERIFY:-auto}" = "false" ]; then
+      warn "math-verify is not installed; SDPO_PREFLIGHT_INSTALL_MATH_VERIFY=false."
+      return 1
+   fi
+   if ! command -v uv >/dev/null 2>&1; then
+      warn "math-verify is not installed and uv was not found."
+      return 1
+   fi
+
+   local version="${SDPO_MATH_VERIFY_VERSION:-0.8.0}"
+   warn "math-verify is not installed; installing math-verify[antlr4_9_3]==${version}"
+   UV_LINK_MODE="${UV_LINK_MODE:-copy}" UV_CACHE_DIR="$UV_CACHE_DIR" uv pip install "math-verify[antlr4_9_3]==${version}"
+}
+
 prepare_cuda_link() {
    local cuda_root="$1"
 
@@ -542,6 +565,7 @@ else
 fi
 patch_sglang_deepgemm_small_batch_guard || fail=1
 patch_sglang_kvcache_jit_guard || fail=1
+install_math_verify_if_needed || warn "DeepMath expression rewards will fall back to exact/DAPO checks."
 
 check_path() {
    local label="$1"
@@ -591,6 +615,11 @@ import examples.sdpo.sdpo
 import train
 
 print("[ok] sglang/megatron/miles imports")
+try:
+    import math_verify  # noqa: F401
+    print("[ok] math_verify import")
+except Exception as exc:
+    print(f"[warn] math_verify import failed: {exc}")
 PY
 
 python - <<'PY' || fail=1

@@ -33,6 +33,10 @@ ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-1}"
 GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-64}"
 MAX_TOKENS_PER_GPU="${MAX_TOKENS_PER_GPU:-16384}"
 MICRO_BATCH_SIZE="${MICRO_BATCH_SIZE:-1}"
+KL_LOSS_COEF="${KL_LOSS_COEF:-0.001}"
+ENTROPY_COEF="${ENTROPY_COEF:-0.0}"
+EPS_CLIP="${EPS_CLIP:-0.2}"
+EPS_CLIP_HIGH="${EPS_CLIP_HIGH:-0.3}"
 QKV_FORMAT="${QKV_FORMAT:-bshd}"
 TENSOR_MODEL_PARALLEL_SIZE="${TENSOR_MODEL_PARALLEL_SIZE:-4}"
 SEQUENCE_PARALLEL="${SEQUENCE_PARALLEL:-false}"
@@ -40,6 +44,8 @@ ROLLOUT_NUM_GPUS_PER_ENGINE="${ROLLOUT_NUM_GPUS_PER_ENGINE:-1}"
 SGLANG_MEM_FRACTION_STATIC="${SGLANG_MEM_FRACTION_STATIC:-0.4}"
 SGLANG_RL_ON_POLICY_TARGET="${SGLANG_RL_ON_POLICY_TARGET:-fsdp}"
 SGLANG_DISABLE_CUDA_GRAPH="${SGLANG_DISABLE_CUDA_GRAPH:-true}"
+DUMP_DETAILS="${DUMP_DETAILS:-}"
+SAVE_DEBUG_ROLLOUT_DATA="${SAVE_DEBUG_ROLLOUT_DATA:-}"
 RAY_DASHBOARD_PORT="${RAY_DASHBOARD_PORT:-8265}"
 RAY_TMPDIR="${RAY_TMPDIR:-/tmp/${USER:-miles}-ray}"
 mkdir -p "$RAY_TMPDIR"
@@ -149,9 +155,11 @@ fi
 SDPO_ARGS=(
    --advantage-estimator on_policy_distillation
    --use-kl-loss
-   --kl-loss-coef 0.00
+   --kl-loss-coef "$KL_LOSS_COEF"
    --kl-loss-type low_var_kl
-   --entropy-coef 0.00
+   --entropy-coef "$ENTROPY_COEF"
+   --eps-clip "$EPS_CLIP"
+   --eps-clip-high "$EPS_CLIP_HIGH"
 
    # Optional Dr.GRPO-style pg-loss reducer:
    # --custom-pg-loss-reducer-function-path examples.DrGRPO.custom_reducer:get_pg_loss_reducer
@@ -203,6 +211,17 @@ if [ -n "${ATTENTION_BACKEND:-}" ]; then
    MISC_ARGS+=(--attention-backend "$ATTENTION_BACKEND")
 fi
 
+DEBUG_ARGS=()
+if [ -n "$DUMP_DETAILS" ]; then
+   mkdir -p "$DUMP_DETAILS"
+   DEBUG_ARGS+=(--dump-details "$DUMP_DETAILS")
+fi
+
+if [ -n "$SAVE_DEBUG_ROLLOUT_DATA" ]; then
+   mkdir -p "$(dirname "$SAVE_DEBUG_ROLLOUT_DATA")"
+   DEBUG_ARGS+=(--save-debug-rollout-data "$SAVE_DEBUG_ROLLOUT_DATA")
+fi
+
 export SDPO_SUCCESS_REWARD_THRESHOLD=${SDPO_SUCCESS_REWARD_THRESHOLD:-0.5}
 export SDPO_INCLUDE_ENVIRONMENT_FEEDBACK=${SDPO_INCLUDE_ENVIRONMENT_FEEDBACK:-true}
 export SDPO_ENVIRONMENT_FEEDBACK_ONLY_WITHOUT_SOLUTION=${SDPO_ENVIRONMENT_FEEDBACK_ONLY_WITHOUT_SOLUTION:-true}
@@ -242,5 +261,6 @@ ray job submit --address="http://127.0.0.1:${RAY_DASHBOARD_PORT}" \
    ${PERF_ARGS[@]} \
    ${EVAL_ARGS[@]} \
    ${SGLANG_ARGS[@]} \
+   ${DEBUG_ARGS[@]} \
    ${MISC_ARGS[@]} \
    ${RM_ARGS[@]}
