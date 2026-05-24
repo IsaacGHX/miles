@@ -1,0 +1,2 @@
+{"prompt": "What is 1 + 1? Put the final answer in \\boxed{}.", "label": "2", "metadata": {"raw_prompt": "What is 1 + 1? Put the final answer in \\boxed{}."}}
+{"prompt": "Compute 3 * 4. Put the final answer in \\boxed{}.", "label": "12", "metadata": {"raw_prompt": "Compute 3 * 4. Put the final answer in \\boxed{}."}}
