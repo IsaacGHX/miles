@@ -183,6 +183,31 @@ ACTOR_NUM_GPUS_PER_NODE=4 ROLLOUT_NUM_GPUS=1 TENSOR_MODEL_PARALLEL_SIZE=4 \
 SAVE_INTERVAL=999 bash examples/sdpo/run-qwen3-8B-sdpo.sh
 ```
 
+For a first DeepMath run with shorter outputs, use:
+
+```bash
+export WANDB_API_KEY=...
+bash examples/sdpo/launch-deepmath-qwen3-8B-sdpo.sh
+```
+
+This launches in the background with defaults:
+
+- 4 actor GPUs plus 4 rollout GPUs on one node
+- `ROLLOUT_BATCH_SIZE=8`, `N_SAMPLES_PER_PROMPT=4`, `GLOBAL_BATCH_SIZE=32`
+- `ROLLOUT_MAX_RESPONSE_LEN=2048`
+- `NUM_ROLLOUT=50`
+- debug rollouts under `outputs/sdpo_deepmath/$RUN_NAME/dump_details`
+
+Override any of those as environment variables before launching. For example:
+
+```bash
+ROLLOUT_MAX_RESPONSE_LEN=4096 \
+ROLLOUT_BATCH_SIZE=4 \
+N_SAMPLES_PER_PROMPT=4 \
+GLOBAL_BATCH_SIZE=16 \
+bash examples/sdpo/launch-deepmath-qwen3-8B-sdpo.sh
+```
+
 Useful environment overrides:
 
 ```bash

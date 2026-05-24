@@ -7,7 +7,10 @@
 #     bash examples/sdpo/run-qwen3-8B-sdpo.sh
 
 set -euo pipefail
-set -x
+
+if [ "${SDPO_XTRACE:-false}" = "true" ]; then
+   set -x
+fi
 
 export PYTHONUNBUFFERED=1
 
@@ -184,6 +187,14 @@ OPTIMIZER_ARGS=(
    --adam-beta2 0.98
 )
 
+SDPO_WANDB_RESTORE_XTRACE=false
+case "$-" in
+   *x*)
+      SDPO_WANDB_RESTORE_XTRACE=true
+      set +x
+      ;;
+esac
+
 USE_WANDB="${USE_WANDB:-false}"
 WANDB_PROJECT="${WANDB_PROJECT:-miles-sdpo}"
 WANDB_GROUP="${WANDB_GROUP:-${MODEL_NAME}-sdpo}"
@@ -194,6 +205,14 @@ WANDB_MODE="${WANDB_MODE:-}"
 WANDB_API_KEY="${WANDB_API_KEY:-${WANDB_KEY:-${WANDB_API:-}}}"
 DISABLE_WANDB_RANDOM_SUFFIX="${DISABLE_WANDB_RANDOM_SUFFIX:-true}"
 
+if [ -n "$WANDB_API_KEY" ]; then
+   export WANDB_API_KEY
+fi
+
+if [ "$SDPO_WANDB_RESTORE_XTRACE" = "true" ]; then
+   set -x
+fi
+
 WANDB_ARGS=()
 if [ "$USE_WANDB" = "true" ]; then
    WANDB_ARGS+=(
@@ -201,10 +220,6 @@ if [ "$USE_WANDB" = "true" ]; then
       --wandb-project "$WANDB_PROJECT"
       --wandb-group "$WANDB_GROUP"
    )
-
-   if [ -n "$WANDB_API_KEY" ]; then
-      WANDB_ARGS+=(--wandb-key "$WANDB_API_KEY")
-   fi
 
    if [ -n "$WANDB_EXPERIMENT_NAME" ]; then
       WANDB_ARGS+=(--wandb-experiment-name "$WANDB_EXPERIMENT_NAME")
@@ -290,7 +305,15 @@ trap cleanup_ray EXIT
 export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus "$NUM_GPUS_PER_NODE" --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port="$RAY_DASHBOARD_PORT" --temp-dir "$RAY_TMPDIR"
 
-RUNTIME_ENV_JSON="{\"env_vars\":{\"PYTHONPATH\":\"${PROJECT_ROOT}:${MEGATRON_PATH}:${PYTHONPATH:-}\",\"CUDA_DEVICE_MAX_CONNECTIONS\":\"1\",\"CUDA_HOME\":\"${CUDA_HOME:-}\",\"CUDA_PATH\":\"${CUDA_PATH:-}\",\"LD_LIBRARY_PATH\":\"${LD_LIBRARY_PATH:-}\",\"PYTORCH_ALLOC_CONF\":\"${PYTORCH_ALLOC_CONF:-expandable_segments:True}\",\"SGLANG_ENABLE_JIT_DEEPGEMM\":\"${SGLANG_ENABLE_JIT_DEEPGEMM:-0}\",\"SGLANG_ENABLE_JIT_KVCACHE\":\"${SGLANG_ENABLE_JIT_KVCACHE:-0}\",\"SGLANG_JIT_DEEPGEMM_PRECOMPILE\":\"${SGLANG_JIT_DEEPGEMM_PRECOMPILE:-0}\",\"SGLANG_BATCH_INVARIANT_OPS_ENABLE_MM_DEEPGEMM\":\"${SGLANG_BATCH_INVARIANT_OPS_ENABLE_MM_DEEPGEMM:-0}\"}}"
+SDPO_RESTORE_XTRACE=false
+case "$-" in
+   *x*)
+      SDPO_RESTORE_XTRACE=true
+      set +x
+      ;;
+esac
+
+RUNTIME_ENV_JSON="{\"env_vars\":{\"PYTHONPATH\":\"${PROJECT_ROOT}:${MEGATRON_PATH}:${PYTHONPATH:-}\",\"CUDA_DEVICE_MAX_CONNECTIONS\":\"1\",\"CUDA_HOME\":\"${CUDA_HOME:-}\",\"CUDA_PATH\":\"${CUDA_PATH:-}\",\"LD_LIBRARY_PATH\":\"${LD_LIBRARY_PATH:-}\",\"PYTORCH_ALLOC_CONF\":\"${PYTORCH_ALLOC_CONF:-expandable_segments:True}\",\"SGLANG_ENABLE_JIT_DEEPGEMM\":\"${SGLANG_ENABLE_JIT_DEEPGEMM:-0}\",\"SGLANG_ENABLE_JIT_KVCACHE\":\"${SGLANG_ENABLE_JIT_KVCACHE:-0}\",\"SGLANG_JIT_DEEPGEMM_PRECOMPILE\":\"${SGLANG_JIT_DEEPGEMM_PRECOMPILE:-0}\",\"SGLANG_BATCH_INVARIANT_OPS_ENABLE_MM_DEEPGEMM\":\"${SGLANG_BATCH_INVARIANT_OPS_ENABLE_MM_DEEPGEMM:-0}\",\"WANDB_API_KEY\":\"${WANDB_API_KEY:-}\",\"WANDB_MODE\":\"${WANDB_MODE:-}\"}}"
 
 ray job submit --address="http://127.0.0.1:${RAY_DASHBOARD_PORT}" \
    --runtime-env-json="$RUNTIME_ENV_JSON" \
@@ -310,3 +333,7 @@ ray job submit --address="http://127.0.0.1:${RAY_DASHBOARD_PORT}" \
    ${DEBUG_ARGS[@]} \
    ${MISC_ARGS[@]} \
    ${RM_ARGS[@]}
+
+if [ "$SDPO_RESTORE_XTRACE" = "true" ]; then
+   set -x
+fi
