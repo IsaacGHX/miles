@@ -36,6 +36,17 @@ ROLLOUT_MAX_PROMPT_LEN="${ROLLOUT_MAX_PROMPT_LEN:-}"
 ROLLOUT_MAX_RESPONSE_LEN="${ROLLOUT_MAX_RESPONSE_LEN:-16384}"
 ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-1}"
 GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-64}"
+EVAL_INTERVAL="${EVAL_INTERVAL:-}"
+EVAL_DATASET_NAME="${EVAL_DATASET_NAME:-deepmath_val}"
+EVAL_PROMPT_DATA="${EVAL_PROMPT_DATA:-}"
+N_SAMPLES_PER_EVAL_PROMPT="${N_SAMPLES_PER_EVAL_PROMPT:-1}"
+EVAL_MAX_RESPONSE_LEN="${EVAL_MAX_RESPONSE_LEN:-$ROLLOUT_MAX_RESPONSE_LEN}"
+EVAL_TEMPERATURE="${EVAL_TEMPERATURE:-0}"
+EVAL_MAX_CONTEXT_LEN="${EVAL_MAX_CONTEXT_LEN:-}"
+EVAL_MAX_PROMPT_LEN="${EVAL_MAX_PROMPT_LEN:-}"
+EVAL_INPUT_KEY="${EVAL_INPUT_KEY:-prompt}"
+EVAL_LABEL_KEY="${EVAL_LABEL_KEY:-label}"
+SKIP_EVAL_BEFORE_TRAIN="${SKIP_EVAL_BEFORE_TRAIN:-false}"
 MAX_TOKENS_PER_GPU="${MAX_TOKENS_PER_GPU:-16384}"
 MICRO_BATCH_SIZE="${MICRO_BATCH_SIZE:-1}"
 KL_LOSS_COEF="${KL_LOSS_COEF:-0.001}"
@@ -134,13 +145,40 @@ RM_ARGS=(
    --custom-reward-post-process-path examples.sdpo.sdpo.post_process_rewards
 )
 
-EVAL_ARGS=(
-   # --eval-interval 20
-   # --eval-prompt-data aime /root/aime-2024/aime-2024.jsonl
-   # --n-samples-per-eval-prompt 16
-   # --eval-max-response-len 16384
-   # --eval-top-p 1
-)
+EVAL_ARGS=()
+if [ -n "$EVAL_INTERVAL" ]; then
+   if [ -z "$EVAL_PROMPT_DATA" ]; then
+      echo "EVAL_PROMPT_DATA must be set when EVAL_INTERVAL is set."
+      echo "Example: EVAL_INTERVAL=10 EVAL_PROMPT_DATA=/path/to/val.jsonl bash examples/sdpo/run-qwen3-8B-sdpo.sh"
+      exit 1
+   fi
+   if [ ! -f "$EVAL_PROMPT_DATA" ]; then
+      echo "EVAL_PROMPT_DATA not found: $EVAL_PROMPT_DATA"
+      exit 1
+   fi
+
+   EVAL_ARGS+=(
+      --eval-interval "$EVAL_INTERVAL"
+      --eval-prompt-data "$EVAL_DATASET_NAME" "$EVAL_PROMPT_DATA"
+      --eval-input-key "$EVAL_INPUT_KEY"
+      --eval-label-key "$EVAL_LABEL_KEY"
+      --n-samples-per-eval-prompt "$N_SAMPLES_PER_EVAL_PROMPT"
+      --eval-max-response-len "$EVAL_MAX_RESPONSE_LEN"
+      --eval-temperature "$EVAL_TEMPERATURE"
+   )
+
+   if [ -n "$EVAL_MAX_CONTEXT_LEN" ]; then
+      EVAL_ARGS+=(--eval-max-context-len "$EVAL_MAX_CONTEXT_LEN")
+   fi
+
+   if [ -n "$EVAL_MAX_PROMPT_LEN" ]; then
+      EVAL_ARGS+=(--eval-max-prompt-len "$EVAL_MAX_PROMPT_LEN")
+   fi
+
+   if [ "$SKIP_EVAL_BEFORE_TRAIN" = "true" ]; then
+      EVAL_ARGS+=(--skip-eval-before-train)
+   fi
+fi
 
 PERF_ARGS=(
    --tensor-model-parallel-size "$TENSOR_MODEL_PARALLEL_SIZE"

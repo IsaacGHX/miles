@@ -208,6 +208,21 @@ GLOBAL_BATCH_SIZE=16 \
 bash examples/sdpo/launch-deepmath-qwen3-8B-sdpo.sh
 ```
 
+Validation is disabled unless `EVAL_INTERVAL` and `EVAL_PROMPT_DATA` are set.
+Use a small held-out JSONL file rather than the full DeepMath training file:
+
+```bash
+EVAL_INTERVAL=10 \
+EVAL_PROMPT_DATA=/path/to/deepmath-val-256.jsonl \
+EVAL_DATASET_NAME=deepmath_val \
+N_SAMPLES_PER_EVAL_PROMPT=1 \
+SKIP_EVAL_BEFORE_TRAIN=true \
+bash examples/sdpo/launch-deepmath-qwen3-8B-sdpo.sh
+```
+
+With `DUMP_DETAILS` enabled, eval rollouts are saved next to train rollouts as
+`$DUMP_DETAILS/rollout_data/eval_<rollout_id>.pt`.
+
 Useful environment overrides:
 
 ```bash
