@@ -28,6 +28,8 @@ SAVE_INTERVAL="${SAVE_INTERVAL:-20}"
 NUM_ROLLOUT="${NUM_ROLLOUT:-300}"
 ROLLOUT_BATCH_SIZE="${ROLLOUT_BATCH_SIZE:-16}"
 N_SAMPLES_PER_PROMPT="${N_SAMPLES_PER_PROMPT:-4}"
+ROLLOUT_MAX_CONTEXT_LEN="${ROLLOUT_MAX_CONTEXT_LEN:-}"
+ROLLOUT_MAX_PROMPT_LEN="${ROLLOUT_MAX_PROMPT_LEN:-}"
 ROLLOUT_MAX_RESPONSE_LEN="${ROLLOUT_MAX_RESPONSE_LEN:-16384}"
 ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-1}"
 GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-64}"
@@ -115,6 +117,14 @@ ROLLOUT_ARGS=(
    --balance-data
 )
 
+if [ -n "$ROLLOUT_MAX_CONTEXT_LEN" ]; then
+   ROLLOUT_ARGS+=(--rollout-max-context-len "$ROLLOUT_MAX_CONTEXT_LEN")
+fi
+
+if [ -n "$ROLLOUT_MAX_PROMPT_LEN" ]; then
+   ROLLOUT_ARGS+=(--rollout-max-prompt-len "$ROLLOUT_MAX_PROMPT_LEN")
+fi
+
 RM_ARGS=(
    --reward-key score
    --custom-rm-path examples.sdpo.sdpo.reward_func
@@ -174,12 +184,48 @@ OPTIMIZER_ARGS=(
    --adam-beta2 0.98
 )
 
-WANDB_ARGS=(
-   # --use-wandb
-   # --wandb-project miles-dev
-   # --wandb-group ${MODEL_NAME}-sdpo
-   # --wandb-key ${WANDB_KEY}
-)
+USE_WANDB="${USE_WANDB:-false}"
+WANDB_PROJECT="${WANDB_PROJECT:-miles-sdpo}"
+WANDB_GROUP="${WANDB_GROUP:-${MODEL_NAME}-sdpo}"
+WANDB_EXPERIMENT_NAME="${WANDB_EXPERIMENT_NAME:-}"
+WANDB_RUN_ID="${WANDB_RUN_ID:-}"
+WANDB_DIR="${WANDB_DIR:-}"
+WANDB_MODE="${WANDB_MODE:-}"
+WANDB_API_KEY="${WANDB_API_KEY:-${WANDB_KEY:-${WANDB_API:-}}}"
+DISABLE_WANDB_RANDOM_SUFFIX="${DISABLE_WANDB_RANDOM_SUFFIX:-true}"
+
+WANDB_ARGS=()
+if [ "$USE_WANDB" = "true" ]; then
+   WANDB_ARGS+=(
+      --use-wandb
+      --wandb-project "$WANDB_PROJECT"
+      --wandb-group "$WANDB_GROUP"
+   )
+
+   if [ -n "$WANDB_API_KEY" ]; then
+      WANDB_ARGS+=(--wandb-key "$WANDB_API_KEY")
+   fi
+
+   if [ -n "$WANDB_EXPERIMENT_NAME" ]; then
+      WANDB_ARGS+=(--wandb-experiment-name "$WANDB_EXPERIMENT_NAME")
+   fi
+
+   if [ -n "$WANDB_RUN_ID" ]; then
+      WANDB_ARGS+=(--wandb-run-id "$WANDB_RUN_ID")
+   fi
+
+   if [ -n "$WANDB_DIR" ]; then
+      WANDB_ARGS+=(--wandb-dir "$WANDB_DIR")
+   fi
+
+   if [ -n "$WANDB_MODE" ]; then
+      WANDB_ARGS+=(--wandb-mode "$WANDB_MODE")
+   fi
+
+   if [ "$DISABLE_WANDB_RANDOM_SUFFIX" = "true" ]; then
+      WANDB_ARGS+=(--disable-wandb-random-suffix)
+   fi
+fi
 
 SGLANG_ARGS=(
    --rollout-num-gpus-per-engine "$ROLLOUT_NUM_GPUS_PER_ENGINE"

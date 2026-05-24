@@ -130,6 +130,37 @@ Set `DUMP_DETAILS` to save per-rollout debug files under
 `$DUMP_DETAILS/rollout_data/{rollout_id}.pt`, together with train and logprob
 debug dumps.
 
+To log SDPO training curves to W&B, keep the API key in your shell or `.env`
+and enable logging at launch time:
+
+```bash
+export WANDB_API_KEY=...
+USE_WANDB=true \
+WANDB_PROJECT=miles-sdpo \
+WANDB_GROUP=qwen3-8b-deepmath \
+WANDB_EXPERIMENT_NAME=qwen3-8b-sdpo-deepmath \
+bash examples/sdpo/run-qwen3-8B-sdpo.sh
+```
+
+The script also accepts the legacy names `WANDB_KEY` and `WANDB_API`, but does
+not store keys in the repo. W&B defines `rollout/*` and `perf/*` against
+`rollout/step`, and `train/*` against `train/step`.
+
+For long-context data, set the rollout context explicitly. For example, a
+35K-token prompt plus an 8K-token response needs at least about 43K context
+tokens after chat-template overhead:
+
+```bash
+ROLLOUT_MAX_PROMPT_LEN=35000 \
+ROLLOUT_MAX_RESPONSE_LEN=8192 \
+ROLLOUT_MAX_CONTEXT_LEN=45056 \
+MICRO_BATCH_SIZE=1 \
+bash examples/sdpo/run-qwen3-8B-sdpo.sh
+```
+
+Only set `ROLLOUT_MAX_CONTEXT_LEN` above the model's configured context window
+if the model and SGLang runtime support that length.
+
 For a new model family/version such as Qwen3.5, keep the CUDA preflight
 unchanged and provide the matching Megatron model config:
 
