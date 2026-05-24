@@ -7,6 +7,12 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
+if [ "${SDPO_SOURCE_DOTENV:-true}" = "true" ] && [ -f "${PROJECT_ROOT}/.env" ]; then
+   set -a
+   source "${PROJECT_ROOT}/.env"
+   set +a
+fi
+
 RUN_NAME="${RUN_NAME:-sdpo-deepmath-qwen3-8b-short-$(date +%Y%m%d-%H%M%S)}"
 RUN_ROOT="${RUN_ROOT:-${PROJECT_ROOT}/outputs/sdpo_deepmath/${RUN_NAME}}"
 mkdir -p "$RUN_ROOT"
